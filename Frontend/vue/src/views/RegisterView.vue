@@ -32,7 +32,6 @@ const router = useRouter()
 const authStore = useAuthStore()
 const apiErrorMessage = ref<string>('')
 const showPassword = ref<boolean>(false)
-const hiddePassword = ref<boolean>(true)
 
 // Computed properties
 const passwordStrength = computed((): number => {
