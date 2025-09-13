@@ -2,19 +2,9 @@
 import { ref, reactive, computed } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "../stores/authStore";
-
-// Types
-interface RegisterFormData {
-  name: string;
-  email: string;
-  password: string;
-  confirmPassword: string;
-  agreeToTerms: boolean;
-}
+import type { RegisterFormData } from "../types";
 
 type FieldName = "name" | "email" | "password" | "confirmPassword";
-
-// Reactive data
 const formData = reactive<RegisterFormData>({
   name: "",
   email: "",
@@ -23,7 +13,6 @@ const formData = reactive<RegisterFormData>({
   agreeToTerms: false,
 });
 
-// Refs for component state
 const focusedField = ref<FieldName | null>(null);
 const isLoading = ref<boolean>(false);
 const router = useRouter();

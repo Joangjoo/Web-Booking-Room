@@ -1,43 +1,17 @@
 <script setup lang="ts">
-import { ref, reactive, computed } from "vue";
+import { ref, reactive, computed, onMounted } from "vue";
+import type {
+  Room,
+  User,
+  BookingForm,
+  CapacityFilter,
+  BookingResponse,
+} from "../types";
+import RoomCard from "../components/RoomCard.vue";
+import apiClient from "../api";
+import { useAuthStore } from '../stores/authStore';
+import router from "../router";
 
-// Types
-interface Room {
-  id: string;
-  name: string;
-  capacity: number;
-  description: string;
-  features: string[];
-  imageUrl?: string;
-  isAvailable: boolean;
-}
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-}
-
-interface BookingForm {
-  roomId: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  purpose: string;
-}
-
-interface CapacityFilter {
-  value: string;
-  label: string;
-}
-
-interface BookingResponse {
-  success: boolean;
-  message: string;
-  bookingId?: string;
-}
-
-// Reactive data
 const currentUser = reactive<User>({
   id: "1",
   name: "John Doe",
@@ -47,22 +21,19 @@ const currentUser = reactive<User>({
 const searchQuery = ref<string>("");
 const selectedCapacityFilter = ref<string>("all");
 const isSearchFocused = ref<boolean>(false);
-
-// Modal state
 const isModalOpen = ref<boolean>(false);
 const selectedRoom = ref<Room | null>(null);
 const isBookingLoading = ref<boolean>(false);
+const authStore = useAuthStore();
 
-// Booking form
 const bookingForm = reactive<BookingForm>({
-  roomId: "",
+  roomId: null,
   date: "",
   startTime: "",
   endTime: "",
   purpose: "",
 });
 
-// Capacity filters
 const capacityFilters: CapacityFilter[] = [
   { value: "all", label: "Semua Kapasitas" },
   { value: "small", label: "< 10 Orang" },
@@ -70,105 +41,24 @@ const capacityFilters: CapacityFilter[] = [
   { value: "large", label: "> 20 Orang" },
 ];
 
-// Mock room data
-const rooms = reactive<Room[]>([
-  {
-    id: "R001",
-    name: "Ruang Meeting Executive",
-    capacity: 8,
-    description:
-      "Ruangan meeting mewah dengan fasilitas lengkap untuk rapat eksekutif dan presentasi penting.",
-    features: [
-      "Proyektor 4K",
-      "AC",
-      "WiFi Cepat",
-      "Whiteboard",
-      "Sound System",
-    ],
-    isAvailable: true,
-  },
-  {
-    id: "R002",
-    name: "Conference Hall Alpha",
-    capacity: 25,
-    description:
-      "Aula konferensi berkapasitas besar dengan teknologi audio-visual terdepan untuk seminar dan workshop.",
-    features: [
-      "LED Display",
-      "Mic Wireless",
-      "AC Central",
-      "Catering Area",
-      "Parking Luas",
-    ],
-    isAvailable: true,
-  },
-  {
-    id: "R003",
-    name: "Creative Space Beta",
-    capacity: 12,
-    description:
-      "Ruang kreatif yang cocok untuk brainstorming, workshop desain, dan diskusi tim yang interaktif.",
-    features: [
-      "Flipchart",
-      "Bean Bags",
-      "Inspirational Wall",
-      "WiFi Premium",
-      "Coffee Corner",
-    ],
-    isAvailable: true,
-  },
-  {
-    id: "R004",
-    name: "Training Room Gamma",
-    capacity: 18,
-    description:
-      "Ruang pelatihan dengan layout fleksibel, ideal untuk training, kursus, dan workshop pendidikan.",
-    features: [
-      "Meja Portable",
-      'Smart TV 65"',
-      "AC",
-      "Storage Cabinet",
-      "Natural Light",
-    ],
-    isAvailable: false,
-  },
-  {
-    id: "R005",
-    name: "Discussion Pod Delta",
-    capacity: 6,
-    description:
-      "Pod diskusi intim untuk meeting kecil, one-on-one, dan diskusi confidential.",
-    features: [
-      "Privacy Glass",
-      "Comfortable Sofa",
-      "Mini Fridge",
-      "Phone Booth Style",
-      "Soundproof",
-    ],
-    isAvailable: true,
-  },
-  {
-    id: "R006",
-    name: "Innovation Lab Epsilon",
-    capacity: 30,
-    description:
-      "Laboratorium inovasi dengan peralatan modern untuk prototyping, testing, dan presentasi produk.",
-    features: [
-      "Lab Equipment",
-      "High-Speed Internet",
-      "Presentation Tools",
-      "Collaboration Space",
-      "Storage System",
-    ],
-    isAvailable: true,
-  },
-]);
+const rooms = ref<Room[]>([]);
 
-// Computed properties
+const fetchRooms = async () => {
+  try {
+    const response = await apiClient.get<Room[]>('/rooms'); // Panggil API
+    rooms.value = response.data || []; // Isi data dari respons
+  } catch (error) {
+    console.error("Gagal mengambil data ruangan:", error);
+    alert("Gagal memuat data ruangan dari server.");
+  }
+};
+
+onMounted(() => {
+  fetchRooms();
+});
+
 const filteredRooms = computed<Room[]>(() => {
-  let filtered = rooms.filter((room) => room.isAvailable);
-
-  // Filter by search query
+  let filtered = rooms.value.filter((room) => room.is_available);
   if (searchQuery.value.trim()) {
     const query = searchQuery.value.toLowerCase();
     filtered = filtered.filter(
@@ -179,7 +69,6 @@ const filteredRooms = computed<Room[]>(() => {
     );
   }
 
-  // Filter by capacity
   if (selectedCapacityFilter.value !== "all") {
     filtered = filtered.filter((room) => {
       switch (selectedCapacityFilter.value) {
@@ -208,7 +97,6 @@ const isBookingFormValid = computed<boolean>(() => {
   );
 });
 
-// Methods
 const setSearchFocused = (focused: boolean): void => {
   isSearchFocused.value = focused;
 };
@@ -222,7 +110,6 @@ const openBookingModal = (room: Room): void => {
   bookingForm.roomId = room.id;
   isModalOpen.value = true;
 
-  // Reset form
   bookingForm.date = "";
   bookingForm.startTime = "";
   bookingForm.endTime = "";
@@ -240,64 +127,56 @@ const handleBooking = async (): Promise<void> => {
     alert("Mohon lengkapi semua field booking!");
     return;
   }
-
   if (bookingForm.startTime >= bookingForm.endTime) {
-    alert("Waktu selesai harus lebih besar dari waktu mulai!");
+    alert("Waktu selesai harus setelah waktu mulai!");
     return;
   }
 
   isBookingLoading.value = true;
 
   try {
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const startTimeISO = new Date(`${bookingForm.date}T${bookingForm.startTime}`).toISOString();
+    const endTimeISO = new Date(`${bookingForm.date}T${bookingForm.endTime}`).toISOString();
 
-    const response: BookingResponse = {
-      success: true,
-      message: "Booking berhasil!",
-      bookingId: "BK" + Date.now(),
+    const payload = {
+      room_id: bookingForm.roomId,
+      start_time: startTimeISO,
+      end_time: endTimeISO,
+      purpose: bookingForm.purpose,
     };
 
-    if (response.success) {
-      alert(
-        `🎉 Booking berhasil!\n\nRuangan: ${selectedRoom.value?.name}\nTanggal: ${bookingForm.date}\nWaktu: ${bookingForm.startTime} - ${bookingForm.endTime}\nBooking ID: ${response.bookingId}`
-      );
-      console.log("Booking successful:", response);
-      closeBookingModal();
-    } else {
-      alert(response.message || "Booking gagal!");
-    }
-  } catch (error) {
+    const response = await apiClient.post('/protected/bookings', payload);
+
+    alert(`🎉 Booking berhasil! ID Booking Anda: ${response.data.booking_id}`);
+    closeBookingModal();
+
+  } catch (error: any) {
     console.error("Booking error:", error);
-    alert("Terjadi kesalahan saat booking. Silakan coba lagi.");
+    const errorMessage = error.response?.data?.error || "Terjadi kesalahan saat booking.";
+    alert(`❌ Gagal Booking: ${errorMessage}`);
   } finally {
     isBookingLoading.value = false;
   }
 };
 
 const handleLogout = (): void => {
-  if (confirm("Apakah Anda yakin ingin logout?")) {
-    alert("Logout berhasil! 👋");
-    console.log("User logged out");
-  }
+  authStore.logout(); 
+  router.push("/login");
 };
 </script>
+
 <template>
   <div
     class="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-black"
   >
-    <!-- Static background overlay -->
     <div
       class="absolute inset-0 bg-gradient-to-tr from-blue-950/40 via-slate-800/30 to-gray-900/50"
     ></div>
-
-    <!-- Header / Navbar -->
     <header
       class="relative z-20 bg-slate-800/90 backdrop-blur-sm border-b border-slate-700/50 shadow-lg"
     >
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex items-center justify-between h-16">
-          <!-- Logo / Title -->
           <div class="flex items-center">
             <h1
               class="text-2xl font-bold bg-gradient-to-r from-blue-300 via-slate-200 to-blue-400 bg-clip-text text-transparent"
@@ -305,8 +184,6 @@ const handleLogout = (): void => {
               📅 Booking Room Dashboard
             </h1>
           </div>
-
-          <!-- User Info & Logout -->
           <div class="flex items-center space-x-4">
             <span class="text-slate-300 text-sm">
               Halo,
@@ -328,12 +205,10 @@ const handleLogout = (): void => {
 
     <!-- Main Content -->
     <main class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <!-- Search & Filter Section -->
       <div
         class="bg-slate-800/90 backdrop-blur-sm rounded-xl shadow-xl shadow-blue-950/20 p-6 border border-slate-700/50 mb-8"
       >
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <!-- Search Bar -->
           <div class="relative">
             <label class="block text-sm font-medium text-slate-300 mb-3">
               🔍 Cari Ruangan
@@ -362,7 +237,6 @@ const handleLogout = (): void => {
                   ></path>
                 </svg>
               </div>
-              <!-- Focus glow effect -->
               <div
                 :class="[
                   'absolute inset-0 rounded-lg bg-gradient-to-r from-blue-500/5 via-slate-500/5 to-blue-600/5 pointer-events-none transition-opacity duration-300',
@@ -371,8 +245,6 @@ const handleLogout = (): void => {
               ></div>
             </div>
           </div>
-
-          <!-- Capacity Filter -->
           <div class="relative">
             <label class="block text-sm font-medium text-slate-300 mb-3">
               👥 Filter Kapasitas
@@ -396,76 +268,13 @@ const handleLogout = (): void => {
         </div>
       </div>
 
-      <!-- Room Cards Grid -->
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div
+        <RoomCard
           v-for="room in filteredRooms"
           :key="room.id"
-          class="bg-slate-800/90 backdrop-blur-sm rounded-xl shadow-xl shadow-blue-950/20 border border-slate-700/50 overflow-hidden transform transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-blue-900/30 cursor-pointer"
-        >
-          <!-- Room Image Placeholder -->
-          <div
-            class="h-48 bg-gradient-to-br from-slate-700 via-blue-800 to-slate-800 relative overflow-hidden"
-          >
-            <div class="absolute inset-0 flex items-center justify-center">
-              <span class="text-6xl opacity-30">🏢</span>
-            </div>
-            <div
-              class="absolute top-3 right-3 px-2 py-1 bg-black/50 rounded-lg text-xs text-slate-300"
-            >
-              ID: {{ room.id }}
-            </div>
-          </div>
-
-          <!-- Room Info -->
-          <div class="p-6">
-            <h3 class="text-xl font-bold text-slate-100 mb-2">
-              {{ room.name }}
-            </h3>
-
-            <div class="flex items-center text-slate-400 text-sm mb-3">
-              <span class="flex items-center">
-                <svg
-                  class="w-4 h-4 mr-1"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                  ></path>
-                </svg>
-                Kapasitas: {{ room.capacity }} Orang
-              </span>
-            </div>
-
-            <p class="text-slate-300 text-sm leading-relaxed mb-4">
-              {{ room.description }}
-            </p>
-
-            <!-- Features -->
-            <div class="flex flex-wrap gap-1 mb-4">
-              <span
-                v-for="feature in room.features"
-                :key="feature"
-                class="px-2 py-1 bg-blue-600/20 text-blue-300 text-xs rounded-full border border-blue-600/30"
-              >
-                {{ feature }}
-              </span>
-            </div>
-
-            <!-- Action Button -->
-            <button
-              @click="openBookingModal(room)"
-              class="w-full py-3 bg-gradient-to-r from-blue-600 via-blue-700 to-slate-700 text-white font-semibold rounded-lg shadow-lg transform transition-all duration-300 hover:scale-105 hover:from-blue-500 hover:via-blue-600 hover:to-slate-600 hover:shadow-2xl hover:shadow-blue-600/30 active:scale-95 focus:outline-none focus:ring-4 focus:ring-blue-500/40"
-            >
-              📋 Lihat Detail & Jadwal
-            </button>
-          </div>
-        </div>
+          :room="room"
+          @view-details="openBookingModal"
+        />
       </div>
 
       <!-- Empty State -->
@@ -488,7 +297,6 @@ const handleLogout = (): void => {
         @click.stop
         class="bg-slate-800/95 backdrop-blur-sm rounded-xl shadow-2xl shadow-blue-950/40 border border-slate-700/50 w-full max-w-2xl max-h-[90vh] overflow-y-auto transform transition-all duration-300"
       >
-        <!-- Modal Header -->
         <div
           class="flex items-center justify-between p-6 border-b border-slate-700/50"
         >

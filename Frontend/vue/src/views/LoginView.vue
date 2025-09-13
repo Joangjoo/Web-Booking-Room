@@ -2,11 +2,9 @@
 import { ref, reactive } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "../stores/authStore";
+import type { LoginFormData } from "../types";
 
-interface LoginFormData {
-  email: string;
-  password: string;
-}
+
 
 const formData = reactive<LoginFormData>({
   email: "",
@@ -36,7 +34,11 @@ const handleLogin = async () => {
   try {
     await authStore.login(formData.email, formData.password);
 
-    router.push("/dashboard");
+    if (authStore.isAdmin) {
+      router.push('/admin'); 
+    } else {
+      router.push('/dashboard'); 
+    }
   } catch (error: any) {
     apiErrorMessage.value =
       error.message || "Terjadi kesalahan tidak diketahui.";

@@ -4,6 +4,7 @@ import type { RouteRecordRaw } from 'vue-router';
 import LoginView from '../views/LoginView.vue';
 import DashboardView from '../views/DashboardView.vue';
 import RegisterView from '../views/RegisterView.vue';
+import AdminDashboardView from '../views/AdminDashboardView.vue';
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -20,6 +21,11 @@ const routes: Array<RouteRecordRaw> = [
     path: '/register',
     name: 'Register',
     component: RegisterView,
+  },
+  {
+    path : '/admin',
+    name : 'AdminDashboard',
+    component : AdminDashboardView,
   },
   {
     path: '/', 

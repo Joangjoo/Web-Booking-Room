@@ -27,12 +27,13 @@ func SetupRouter(db *sql.DB) *gin.Engine {
 		api.GET("/rooms/:id", h.GetRoomByID)
 	}
 
-	// Grup untuk rute terproteksi (perlu token JWT)
 	protected := router.Group("/api/protected")
-	protected.Use(h.AuthMiddleware()) // Middleware juga dipanggil sebagai method
+	protected.Use(h.AuthMiddleware()) 
 	{
 		protected.POST("/bookings", h.CreateBooking)
-		// Tambahkan rute terproteksi lainnya di sini jika ada
+		protected.POST("/rooms", h.CreateRoom)
+		protected.PUT("/rooms/:id", h.UpdateRoom)
+		protected.DELETE("/rooms/:id", h.DeleteRoom)
 	}
 
 	return router

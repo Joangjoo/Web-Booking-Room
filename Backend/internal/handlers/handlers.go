@@ -53,7 +53,7 @@ func (h *Handler) AuthMiddleware() gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Token tidak valid: " + err.Error()})
 			return
 		}
-		
+
 		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 			userID := claims["user_id"]
 			c.Set("userID", userID)
@@ -97,14 +97,15 @@ func (h *Handler) LoginUser(c *gin.Context) {
 	var userName string
 	var hashedPassword string
 	var userID int
+	var userRole string
 
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	querySQL := `SELECT id, name, password_hash FROM users WHERE email = $1`
-	err := h.DB.QueryRow(querySQL, payload.Email).Scan(&userID, &userName, &hashedPassword)
+	querySQL := `SELECT id, name, password_hash, role FROM users WHERE email = $1`
+	err := h.DB.QueryRow(querySQL, payload.Email).Scan(&userID, &userName, &hashedPassword, &userRole)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Email atau password salah"})
@@ -129,6 +130,7 @@ func (h *Handler) LoginUser(c *gin.Context) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": userID,
 		"name":    userName,
+		"role":    userRole,
 		"exp":     time.Now().Add(time.Hour * 24).Unix(),
 	})
 
@@ -240,4 +242,66 @@ func (h *Handler) CreateBooking(c *gin.Context) {
 		"message":    "Booking berhasil dibuat!",
 		"booking_id": bookingID,
 	})
+}
+
+func (h *Handler) CreateRoom(c *gin.Context) {
+	var newRoom models.Room
+
+	if err := c.ShouldBindJSON(&newRoom); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Input tidak valid: " + err.Error()})
+		return
+	}
+
+	insertSQL := `INSERT INTO rooms (name, description, capacity, features, is_available) 
+	VALUES ($1, $2, $3, $4, $5) RETURNING id`
+
+	err := h.DB.QueryRow(insertSQL, newRoom.Name, newRoom.Description, newRoom.Capacity, newRoom.Features, newRoom.IsAvailable).Scan(&newRoom.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menyimpan ruangan baru"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, newRoom)
+}
+
+// UpdateRoom - Handler untuk memperbarui ruangan yang ada
+func (h *Handler) UpdateRoom(c *gin.Context) {
+	roomID := c.Param("id")
+	var updatedRoom models.Room
+
+	if err := c.ShouldBindJSON(&updatedRoom); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Input tidak valid: " + err.Error()})
+		return
+	}
+
+	updateSQL := `UPDATE rooms SET name=$1, description=$2, capacity=$3, features=$4, is_available=$5 WHERE id=$6`
+
+	_, err := h.DB.Exec(updateSQL, updatedRoom.Name, updatedRoom.Description, updatedRoom.Capacity, updatedRoom.Features, updatedRoom.IsAvailable, roomID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal memperbarui ruangan"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Ruangan berhasil diperbarui"})
+}
+
+// DeleteRoom - Handler untuk menghapus ruangan
+func (h *Handler) DeleteRoom(c *gin.Context) {
+	roomID := c.Param("id")
+
+	deleteSQL := `DELETE FROM rooms WHERE id=$1`
+
+	res, err := h.DB.Exec(deleteSQL, roomID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menghapus ruangan"})
+		return
+	}
+
+	rowsAffected, _ := res.RowsAffected()
+	if rowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Ruangan tidak ditemukan untuk dihapus"})
+		return
+	}
+
+	c.Status(http.StatusNoContent) // Standar respons untuk delete sukses
 }

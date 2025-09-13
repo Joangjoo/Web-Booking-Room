@@ -3,10 +3,10 @@ package main
 import (
 	"database/sql"
 	"log"
-	"os" // <-- Tambahkan import os
+	"os" 
 
 	"example.com/Backend/internal/router"
-	"github.com/joho/godotenv" // <-- Tambahkan import godotenv
+	"github.com/joho/godotenv" 
 	_ "github.com/lib/pq"
 )
 
