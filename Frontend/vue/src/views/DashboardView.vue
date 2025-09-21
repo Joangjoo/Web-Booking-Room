@@ -2,21 +2,16 @@
 import { ref, reactive, computed, onMounted } from "vue";
 import type {
   Room,
-  User,
   BookingForm,
   CapacityFilter,
-  BookingResponse,
 } from "../types";
 import RoomCard from "../components/RoomCard.vue";
 import apiClient from "../api";
 import { useAuthStore } from '../stores/authStore';
 import router from "../router";
+import { useNotificationStore } from "../stores/notificationStore";
 
-const currentUser = reactive<User>({
-  id: "1",
-  name: "John Doe",
-  email: "john@example.com",
-});
+
 
 const searchQuery = ref<string>("");
 const selectedCapacityFilter = ref<string>("all");
@@ -25,6 +20,7 @@ const isModalOpen = ref<boolean>(false);
 const selectedRoom = ref<Room | null>(null);
 const isBookingLoading = ref<boolean>(false);
 const authStore = useAuthStore();
+const notificationStore = useNotificationStore();
 
 const bookingForm = reactive<BookingForm>({
   roomId: null,
@@ -45,8 +41,8 @@ const rooms = ref<Room[]>([]);
 
 const fetchRooms = async () => {
   try {
-    const response = await apiClient.get<Room[]>('/rooms'); // Panggil API
-    rooms.value = response.data || []; // Isi data dari respons
+    const response = await apiClient.get<Room[]>('/rooms'); 
+    rooms.value = response.data || []; 
   } catch (error) {
     console.error("Gagal mengambil data ruangan:", error);
     alert("Gagal memuat data ruangan dari server.");
@@ -147,7 +143,11 @@ const handleBooking = async (): Promise<void> => {
 
     const response = await apiClient.post('/protected/bookings', payload);
 
-    alert(`🎉 Booking berhasil! ID Booking Anda: ${response.data.booking_id}`);
+    notificationStore.showToast({
+      type: 'success',
+      title: 'Berhasil!',
+      message: `Ruangan '${response.data.room_name}' berhasil di-booking.`
+    });
     closeBookingModal();
 
   } catch (error: any) {
@@ -181,14 +181,14 @@ const handleLogout = (): void => {
             <h1
               class="text-2xl font-bold bg-gradient-to-r from-blue-300 via-slate-200 to-blue-400 bg-clip-text text-transparent"
             >
-              📅 Booking Room Dashboard
+              📅 Booking Room 
             </h1>
           </div>
           <div class="flex items-center space-x-4">
-            <span class="text-slate-300 text-sm">
+            <span class="text-slate-300 text-sm" v-if="authStore.user">
               Halo,
               <span class="font-medium text-blue-400">{{
-                currentUser.name
+                authStore.user.name
               }}</span>
               👋
             </span>

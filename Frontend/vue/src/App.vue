@@ -1,9 +1,10 @@
-<template>
-  <router-view />
-</template>
-
 <script setup lang="ts">
+import { RouterView } from 'vue-router'
+import ToastContainer from '../src/components/ToastContainer.vue' 
 </script>
 
-<style>
-</style>
+<template>
+  <div>
+    <RouterView />
+    <ToastContainer /> </div>
+</template>

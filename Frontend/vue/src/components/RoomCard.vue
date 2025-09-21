@@ -1,12 +1,10 @@
 <script setup lang="ts">
 import type { Room } from "../types";
 
-// Komponen ini menerima 'room' sebagai properti dari parent (DashboardView)
 defineProps<{
   room: Room;
 }>();
 
-// Komponen ini bisa memancarkan (emit) event ke parent
 const emit = defineEmits<{
   (e: "view-details", room: Room): void;
 }>();
@@ -23,7 +21,7 @@ const emit = defineEmits<{
         <span class="text-6xl opacity-30">🏢</span>
       </div>
       <div
-        v-if="!room.isAvailable"
+        v-if="!room.is_available"
         class="absolute inset-0 bg-black/60 flex items-center justify-center"
       >
         <span
@@ -65,7 +63,7 @@ const emit = defineEmits<{
 
       <button
         @click="emit('view-details', room)"
-        :disabled="!room.isAvailable"
+        :disabled="!room.is_available"
         class="w-full py-3 bg-gradient-to-r from-blue-600 via-blue-700 to-slate-700 text-white font-semibold rounded-lg shadow-lg transform transition-all duration-300 hover:scale-105 hover:from-blue-500 hover:via-blue-600 hover:to-slate-600 hover:shadow-2xl hover:shadow-blue-600/30 active:scale-95 focus:outline-none focus:ring-4 focus:ring-blue-500/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
       >
         📋 Lihat Detail & Jadwal

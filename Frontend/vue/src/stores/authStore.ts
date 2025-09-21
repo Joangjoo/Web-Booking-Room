@@ -48,20 +48,19 @@ export const useAuthStore = defineStore("auth", {
         };
       } catch (error) {
         console.error("Gagal decode token:", error);
-        this.logout(); // Jika token tidak valid, langsung logout
+        this.logout(); 
       }
     },
 
     logout() {
       this.token = null;
-      this.user = null; // Pastikan data user juga dibersihkan
+      this.user = null; 
       localStorage.removeItem("token");
       delete axios.defaults.headers.common["Authorization"];
-      router.push("/login"); // Arahkan ke halaman login
+      router.push("/login"); 
     },
 
     /**
-     * Aksi Login: Menghubungi backend API untuk autentikasi.
      * @param email Email pengguna.
      * @param password Password pengguna.
      */
@@ -71,6 +70,7 @@ export const useAuthStore = defineStore("auth", {
           email: email,
           password: password,
         });
+        
         if (response.data && response.data.token) {
           this.setToken(response.data.token); 
         } else {

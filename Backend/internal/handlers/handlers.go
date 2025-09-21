@@ -238,9 +238,20 @@ func (h *Handler) CreateBooking(c *gin.Context) {
 		return
 	}
 
+	var roomName string
+	roomQuery := `SELECT name FROM rooms WHERE id = $1`
+	err = h.DB.QueryRow(roomQuery, input.RoomID).Scan(&roomName)
+	if err != nil {
+		c.JSON(http.StatusCreated, gin.H{
+			"message":    "Booking berhasil dibuat!",
+			"booking_id": bookingID,
+		})
+		return
+	}
 	c.JSON(http.StatusCreated, gin.H{
 		"message":    "Booking berhasil dibuat!",
 		"booking_id": bookingID,
+		"room_name":  roomName,
 	})
 }
 
@@ -264,7 +275,6 @@ func (h *Handler) CreateRoom(c *gin.Context) {
 	c.JSON(http.StatusCreated, newRoom)
 }
 
-// UpdateRoom - Handler untuk memperbarui ruangan yang ada
 func (h *Handler) UpdateRoom(c *gin.Context) {
 	roomID := c.Param("id")
 	var updatedRoom models.Room
@@ -285,7 +295,6 @@ func (h *Handler) UpdateRoom(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Ruangan berhasil diperbarui"})
 }
 
-// DeleteRoom - Handler untuk menghapus ruangan
 func (h *Handler) DeleteRoom(c *gin.Context) {
 	roomID := c.Param("id")
 
@@ -303,5 +312,87 @@ func (h *Handler) DeleteRoom(c *gin.Context) {
 		return
 	}
 
-	c.Status(http.StatusNoContent) // Standar respons untuk delete sukses
+	c.Status(http.StatusNoContent) 
+}
+
+
+func (h *Handler) MeHandler(c *gin.Context) {
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing token"})
+		return
+	}
+
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Format token tidak valid"})
+		return
+	}
+	tokenString := parts[1]
+
+	jwtSecret := []byte(os.Getenv("JWT_SECRET_KEY"))
+	if len(jwtSecret) == 0 {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "JWT secret belum dikonfigurasi"})
+		return
+	}
+
+	claims := jwt.MapClaims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+		return jwtSecret, nil
+	})
+	if err != nil || !token.Valid {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+		return
+	}
+
+	userID := int(claims["user_id"].(float64))
+
+	var user models.User
+	query := `SELECT id, name, email FROM users WHERE id=$1`
+	err = h.DB.QueryRow(query, userID).Scan(&user.ID, &user.Name, &user.Email)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengambil data user"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, user)
+}
+
+func (h *Handler) GetAllBookings(c *gin.Context) {
+	querySQL := `
+		SELECT 
+			b.id, 
+			r.name as room_name, 
+			u.name as user_name, 
+			b.start_time, 
+			b.end_time, 
+			b.purpose, 
+			b.status
+		FROM bookings b
+		JOIN rooms r ON b.room_id = r.id
+		JOIN users u ON b.user_id = u.id
+		ORDER BY b.start_time DESC`
+
+	rows, err := h.DB.Query(querySQL)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengambil data booking"})
+		return
+	}
+	defer rows.Close()
+
+	var bookings []models.BookingDetails
+	for rows.Next() {
+		var booking models.BookingDetails
+		if err := rows.Scan(&booking.ID, &booking.RoomName, &booking.UserName, &booking.StartTime, &booking.EndTime, &booking.Purpose, &booking.Status); err != nil {
+			log.Printf("Error scanning booking row: %v", err)
+			continue
+		}
+		bookings = append(bookings, booking)
+	}
+
+	c.JSON(http.StatusOK, bookings)
 }
